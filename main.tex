@@ -1,0 +1,293 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb, amsthm}
+\newtheorem{thm}{Theorem}
+\newtheorem{defn}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{example}{Example}
+\newtheorem{proposition}{Proposition} % Define the proposition environment
+\newtheorem{lemma}{Lemma}
+\newtheorem{claim}{Claim}
+\usepackage{graphicx} 
+\usepackage{hyperref}
+\title{Prove Various Size AIR with Batch MLPCS}
+\author{}
+\date{}
+
+\begin{document}
+
+
+
+\maketitle
+\section{Formalization of Constraints in AIR Traces}
+
+This section formalizes the concepts and constraints in AIR traces, including multilinear polynomial encodings, virtual columns, and the translation of constraints into sumcheck constraints. We address AIR traces with varying column heights and demonstrate how constraints over these traces reduce to sum checks over virtual polynomials.
+
+\subsection{AIR Traces and Multilinear Polynomial Encoding}
+
+\paragraph{Definition of AIR Trace.} An AIR trace is a computational representation structured as a matrix, where:
+\begin{itemize}
+    \item Rows represent computation steps.
+    \item Columns represent variables or registers.
+    \item Cells hold values from a finite field \( \mathbb{F} \).
+\end{itemize}
+
+The columns of the AIR trace can have varying heights, each height being a power of 2. For a column \( c \) of height \( H = 2^n \), the values are encoded as a multilinear polynomial \( P(X_1, \dots, X_n) \) over the Boolean hypercube \( \{0, 1\}^n \). This encoding ensures that the polynomial evaluation at each point corresponds to a value in the column.
+
+\paragraph{Multilinear Polynomial Encoding.} A column \( c \) of height \( H = 2^n \) is encoded as:
+\[
+P(X_1, \dots, X_n) = \sum_{v \in \{0, 1\}^n} c[v] \cdot \prod_{i=1}^n (1 - X_i)^{1-v_i} X_i^{v_i},
+\]
+where \( c[v] \) is the value at row \( v \), and \( v \in \{0, 1\}^n \) represents a binary vector indexing the rows.
+
+
+\subsection{Virtual Columns and Virtual Polynomials}
+
+\paragraph{Definition of Virtual Column.} A virtual column is a derived entity formed by applying an algebraic function \( f \) to a subset of columns in the AIR trace. If \( P_1, \dots, P_k \) encode the subset of columns, the virtual column is represented by the virtual polynomial:
+\[
+Q(X) = f(P_1(X), \dots, P_k(X)).
+\]
+
+\subsection{Rotation of Virtual Polynomials}
+
+We define the notion of a cyclic shift of a virtual polynomial, which corresponds to a cyclic permutation of the underlying column values in an AIR trace.
+
+\paragraph{Definition of Rotation.} Let \( Q(X) \) be a virtual polynomial over the Boolean hypercube \( \{0, 1\}^n \), encoding a column of length \( 2^n \). The cyclic rotation by 1 of \( Q \) is defined as:
+\[
+Q^{\text{rot}}(X) = \sum_{v \in \{0, 1\}^n} c[(v - 1) \mod 2^n] \cdot \prod_{i=1}^n (1 - X_i)^{1 - v_i} X_i^{v_i}
+\]
+where:
+\begin{itemize}
+    \item \( c[v] \) are the coefficients encoding the column values.
+    \item \( (v - 1) \mod 2^n \) performs a cyclic shift of the row indices.
+\end{itemize}
+
+
+\paragraph{Hyperplonk Method: Rotation Verification via Multiset Equality.}  The alternative idea is to have, at the expense of increasing the commitment cost of prover, let the prover supply the virtual column commitment of  \( Q^{\text{rot}}(X) \).
+To verify that the prover’s supplied closed-form expression for \( Q^{\text{rot}}(X) \) is indeed the correct cyclic rotation of \( Q(X) \), we reduce the problem to a multiset equality check. First, define the identity function on the Boolean hypercube as
+\[
+\text{id}(x) = \sum_{i=1}^{n} 2^{i-1} x_i,
+\]
+which maps a binary vector \( x = (x_1,\dots,x_n) \) to its corresponding integer. Then, consider the two multisets:
+\[
+\{(Q(x),\, \text{id}(x)) : x \in \{0,1\}^n\} \quad \text{and} \quad \{(Q^{\text{rot}}(x),\, \text{id}(x)+1) : x \in \{0,1\}^n\}.
+\]
+If these multisets are equal, it certifies that \( Q^{\text{rot}}(X) \) is exactly the result of applying the cyclic permutation (i.e., incrementing the index by 1 modulo \(2^n\)) to the coefficients of \( Q(X) \). This reduction to a multiset equality check efficiently verifies the correctness of the rotation.
+
+
+
+\paragraph{Binius Method: Rotation via the Rote Kernel and Convolution.}  
+We define the\emph{ kernel} \(\text{rote}(X,Y)\) as a bivariate polynomial over Boolean vectors \(X = (x_1,\dots,x_n)\) and \(Y = (y_1,\dots,y_n)\) that acts as an indicator for a cyclic shift: it equals 1 if and only if the integer value of \(Y\),
+\[
+\text{int}(Y)=\sum_{i=1}^n 2^{i-1} y_i,
+\]
+satisfies
+\[
+\text{int}(Y) \equiv \text{int}(X)+1 \pmod{2^n},
+\]
+and is 0 otherwise.
+
+A key tool to compute \(\text{rote}(X,Y)\) efficiently is a recurrence relation that builds the kernel for \(n+1\) bits from the kernel for \(n\) bits. To explain, let us write 
+\[
+X=(X',\,x_{n+1})\quad \text{and}\quad Y=(Y',\,y_{n+1}),
+\]
+where \(X'=(x_1,\dots,x_n)\) and \(Y'=(y_1,\dots,y_n)\). The integer interpretations then become
+\[
+\text{int}(X)=2^n \cdot x_{n+1}+\text{int}(X')\quad \text{and}\quad \text{int}(Y)=2^n \cdot y_{n+1}+\text{int}(Y').
+\]
+There are two cases to consider when we require
+\[
+\text{int}(Y) \equiv \text{int}(X)+1 \pmod{2^{n+1}}:
+\]
+\begin{enumerate}
+    \item \textbf{No Rollover:} If \(\text{int}(X')\) is not maximal (i.e. \(X' \neq (1,\dots,1)\)), then adding 1 does not cause a carry into the \((n+1)\)th bit. In this case, we must have \(x_{n+1}=y_{n+1}\) and the condition reduces to \(\text{rote}_n(X',Y')=1\).
+    \item \textbf{Rollover:} If \(X'=(1,\dots,1)\) (i.e. \(\text{int}(X')=2^n-1\)), then adding 1 causes a carry. Here, the condition forces \(y_{n+1}\neq x_{n+1}\) and, necessarily, \(Y'=(0,\dots,0)\).
+\end{enumerate}
+We capture these cases using indicator polynomials. Define
+\[
+\mathbf{1}_{\max}(X') = \prod_{i=1}^n x_i \quad \text{and} \quad \mathbf{1}_{0}(Y') = \prod_{i=1}^n (1-y_i),
+\]
+which are 1 if \(X'\) is maximal and if \(Y'\) is all zeros, respectively. Then, the recurrence is given by:
+\[
+\begin{aligned}
+\text{rote}_{n+1}(X,Y) =\; &\Bigl[(1-x_{n+1})(1-y_{n+1}) + x_{n+1}y_{n+1}\Bigr]\,\text{rote}_n(X',Y')\\[1mm]
+&+ \Bigl[(1-x_{n+1})y_{n+1} + x_{n+1}(1-y_{n+1})\Bigr]\,\mathbf{1}_{\max}(X')\,\mathbf{1}_{0}(Y').
+\end{aligned}
+\]
+
+In the first term, the factor \((1-x_{n+1})(1-y_{n+1}) + x_{n+1}y_{n+1}\) is 1 exactly when \(x_{n+1}=y_{n+1}\), ensuring that no rollover occurs, so the condition depends solely on the \(n\)-bit kernel \(\text{rote}_n(X',Y')\). In the second term, the factor \((1-x_{n+1})y_{n+1} + x_{n+1}(1-y_{n+1})\) detects a rollover (i.e. \(x_{n+1}\neq y_{n+1}\)), and the product \(\mathbf{1}_{\max}(X')\,\mathbf{1}_{0}(Y')\) enforces that \(X'\) is maximal and \(Y'\) is zero.
+
+This recurrence can be evaluated in \(O(n)\) time using dynamic programming. 
+
+Once the rote kernel \(\text{rote}(X,Y)\) is efficiently computed, we express the rotated polynomial \(Q^{\text{rot}}(X)\) as a convolution of the original polynomial \(Q(Y)\) with the kernel:
+\[
+Q^{\text{rot}}(X) = \sum_{Y \in \{0,1\}^n} \text{rote}(X,Y)\, Q(Y).
+\]
+In this convolution, for each fixed \(X\), the kernel \(\text{rote}(X,Y)\) selects the unique \(Y\) (if it exists) such that \(\text{int}(Y) \equiv \text{int}(X)+1 \pmod{2^n}\). Thus, this convolution effectively shifts the coefficients of \(Q\) as prescribed by the cyclic rotation. 
+
+In order to open $Q^{\text{rot}}(X)$ at any point $Z$, we will the convolution in terms of a sumcheck, and reduces to open $Q(R)$ and the verifier evaluating $\text{rote}(Z,R)$ in time \(O(n)\).
+
+
+
+
+\subsection{Constraints over AIR Traces}
+
+\paragraph{Definition of Constraints.} AIR traces are subject to constraints that ensure the correctness of the represented computation. The two main types of constraints are:
+
+\begin{itemize}
+    \item \textbf{Global Sum Constraints:} These constraints involve summing a single (virtual) column. In the simplest form, a global sum constraint is written as
+    \[
+    \sum_{v \in \{0, 1\}^n} Q(v) = 0,
+    \]
+    where \( Q(X) \) is the (virtual) polynomial encoding the column. More generally, one may wish to enforce this constraint only on a specified subset of the domain. In such cases, a \emph{multivariate selector polynomial} is used. Let \(\mathsf{Enabled} \subset D_{\text{trace}}\) be the subset of points where the constraint is active, and let
+    \[
+    S_{\mathsf{Enabled}}(X_1,\ldots,X_n)
+    \]
+    be a multivariate polynomial satisfying
+    \[
+    S_{\mathsf{Enabled}}(v)=1 \quad \text{if } v\in \mathsf{Enabled}, \quad \text{and} \quad S_{\mathsf{Enabled}}(v)=0 \quad \text{otherwise.}
+    \]
+    For example, consider the following selectors:
+    \begin{itemize}
+        \item \emph{First row selector:} This selector is active only on the first row (i.e. when all coordinates are 0). It is defined as
+        \[
+        S_{\text{first}}(X_1,\dots,X_n) = \prod_{i=1}^n (1-X_i).
+        \]
+        \item \emph{Last row selector:} Assuming the last row is represented by \( X_1=X_2=\cdots=X_n=1 \), the selector is given by
+        \[
+        S_{\text{last}}(X_1,\dots,X_n) = \prod_{i=1}^n X_i.
+        \]
+        \item \emph{Transition selector (all but last row):} This selector is active on every row except the last one, and can be defined as
+        \[
+        S_{\text{trans}}(X_1,\dots,X_n) = 1 - \prod_{i=1}^n X_i.
+        \]
+    \end{itemize}
+    The generalized global sum constraint then becomes
+    \[
+    \sum_{v \in \{0, 1\}^n} Q(v) \cdot S_{\mathsf{Enabled}}(v) = 0.
+    \]
+    
+    \item \textbf{Zero-check Constraints:} These constraints enforce that a relation among multiple columns vanishes over the domain. A basic zero-check is written as
+    \[
+    P_1(X) + P_2(X) \cdot P_3(X) = 0,\quad \forall X \in \{0, 1\}^n,
+    \]
+    where \( P_1, P_2, P_3 \) encode columns of the same height. More generally, to apply the constraint only over a designated subset of the domain, one multiplies the (virtual) polynomial by a multivariate selector. That is, a generalized zero-check constraint takes the form
+    \[
+    Q(X) \cdot S_{\mathsf{Enabled}}(X) = 0,\quad \forall X \in \{0, 1\}^n,
+    \]
+    where \( S_{\mathsf{Enabled}}(X_1,\ldots,X_n) \) is defined as above. For instance, if the zero-check should hold only on the last row or on all rows except the last, one would use \( S_{\text{last}}(X) \) or \( S_{\text{trans}}(X) \) respectively.
+    
+\end{itemize}
+
+
+
+\subsection{Translation of Constraints into Sumcheck Problems}
+
+\paragraph{Reduction to Sumcheck.}  
+All constraints over the AIR trace can be expressed as statements about the sum of a (virtual) polynomial, optionally multiplied by a multivariate selector, over the Boolean hypercube:
+\[
+\sum_{X \in \{0, 1\}^n} Q(X) \cdot S(X) = 0.
+\]
+Here, \( S(X) \) is a selector polynomial that activates the constraint only on a desired subset of the domain (e.g., first row, last row, or all but the last row). Global constraints directly reduce to sum checks of the corresponding virtual polynomial (possibly with a selector), and similarly, zero-check constraints can be expressed in this form.
+
+\begin{lemma}
+Zero-check constraints can be converted into sumcheck problems using random tensors.
+\end{lemma}
+
+\begin{proof}
+Consider a zero-check constraint on a virtual polynomial \( Q(X) \) that is required to vanish on a designated subset of the domain as determined by a selector polynomial \( S(X) \):
+\[
+Q(X) \cdot S(X) = 0, \quad \forall X \in \{0, 1\}^n.
+\]
+To verify this constraint, one can introduce a random tensor \( R(X) \) (chosen by the verifier) and perform the sumcheck protocol for:
+\[
+\sum_{X \in \{0, 1\}^n} Q(X) \cdot S(X) \cdot R(X).
+\]
+If the constraint is violated on any of the selected points, then with high probability (over the randomness in \( R(X) \)), the sum will deviate from 0.
+\end{proof}
+
+\subsection{Batched Sumcheck Reduction and Summary of Constraints}
+
+Using virtual polynomials, multivariate selector polynomials, and random tensors, all constraints over an AIR trace can be reduced to sumcheck equations of the form
+\[
+\sum_{X \in \{0, 1\}^n} Q_i(X) \cdot R_i(X) \cdot S_i(X) = 0,
+\]
+where:
+\begin{itemize}
+    \item \( Q_i(X) \) is a virtual polynomial derived from the AIR trace columns and encoding the corresponding constraint,
+    \item \( S_i(X) \) is a multivariate selector polynomial that activates the constraint only on a designated subset of the domain (for example, using selectors such as \( S_{\text{first}}(X) = \prod_{i=1}^n (1-X_i) \), \( S_{\text{last}}(X) = \prod_{i=1}^n X_i \), or \( S_{\text{trans}}(X) = 1-\prod_{i=1}^n X_i \)), and
+    \item \( R_i(X) \) is a random tensor (or random challenge function) introduced by the verifier to facilitate soundness in the sumcheck protocol.
+\end{itemize}
+
+By taking a random linear combination of these individual constraints, we obtain a single batched sumcheck equation of the form
+\[
+\sum_{X \in \{0, 1\}^n} \left( \sum_i \alpha_i \, Q_i(X) \cdot R_i(X) \cdot S_i(X) \right) = 0,
+\]
+where the coefficients \( \alpha_i \) are random elements from the field. This single equation encapsulates the verification of all the original constraints simultaneously.
+
+
+\section{Proving Constraints via Sumcheck and Random Folding}
+
+
+
+
+\subsection{Concurrent Sumcheck and Random Folding Protocol}
+
+The proof system employs two main protocols that are executed concurrently:
+
+\paragraph{Random Folding.}  
+Random folding is used to commit to the coefficient representation of a multilinear polynomial. Recall that each column \( c \) of height \( H = 2^n \) is encoded as
+\[
+P(X_1, \dots, X_n) = \sum_{v \in \{0, 1\}^n} c[v] \cdot \prod_{i=1}^n (1 - X_i)^{1-v_i} X_i^{v_i}.
+\]
+Since the virtual polynomial \( Q_i(X) \) is defined over the multilinear basis, the prover must recover its coefficient representation (denoted by \(\text{coeff}_{Q_i}\)) before committing to it. The random folding protocol then proceeds as follows:
+\begin{enumerate}
+    \item \textbf{Commitment:} The prover computes the coefficient vector \(\text{coeff}_{Q_i}\) for \( Q_i(X) \) and encodes it using a foldably computable linear code (via an FFT) to produce an encoded vector. This vector is committed using a Merkle tree, with the Merkle root sent to the verifier.
+    \item \textbf{Folding Rounds:} In each of the \( n \) rounds, the verifier sends a random challenge \( r_i \). The prover then folds the current codeword to obtain a new codeword of half the size, and commits to it via a new Merkle tree.
+    \item \textbf{Final Claim:} After \( n \) rounds, the prover produces a final folding commitment that represents the evaluation of \( Q_i(X) \) at the random point \( (r_1, \dots, r_n) \); in other words, it reveals \( Q_i(r_1, \dots, r_n) \).
+\end{enumerate}
+
+\paragraph{Sumcheck Protocol.}  
+Independently, the sumcheck protocol reduces the global batched sumcheck equation
+\[
+\sum_{X \in \{0, 1\}^n} \left( \sum_i \alpha_i \, Q_i(X) \cdot R_i(X) \cdot S_i(X) \right)
+\]
+to a claim about the value of the combined polynomial at a random point. Over \( n \) rounds, the verifier and prover interact, with the verifier sending challenges (denoted by \( r_1, \dots, r_n \)) that progressively reduce the sum over the Boolean hypercube to an evaluation of the polynomials at these points.
+
+\paragraph{Concurrent Execution and Final Check.}  
+A key observation is that the random challenges \( (r_1, \dots, r_n) \) used in the random folding protocol can be set equal to those in the sumcheck protocol. Consequently, by the end of the sumcheck, the verifier obtains a final claim of the form
+\[
+\sum_i \alpha_i \, Q_i(r_1,\dots,r_n) \cdot R_i(r_1,\dots,r_n) \cdot S_i(r_1,\dots,r_n),
+\]
+which is then compared with the values \( Q_i(r_1,\dots,r_n) \) provided by the random folding protocol. Since \( R_i \) and \( S_i \) are efficiently evaluable due to their succinct expressions, the verifier can locally compute the product \( R_i(r_1,\dots,r_n) \cdot S_i(r_1,\dots,r_n) \) and verify that the final sumcheck claim is consistent with the outcome of the random folding.
+
+
+\subsection{Using WHIR for Batch CRS Verification of Sumcheck Constraints [In progress]}
+
+For each constraint \(i\), let \( Q_i(X) \) be the corresponding virtual polynomial, and let \( R_i(X) \) and \( S_i(X) \) be the associated random tensor and selector polynomial, respectively. We define a weight polynomial \( w_i(x, X) \) for each \(i\) by
+\[
+w_i(x, X) := R_i(X) \cdot S_i(X) \cdot x.
+\]
+Then, when evaluating at \(x = Q_i(X)\), the CRS condition
+\[
+\sum_{X \in \{0,1\}^n} w_i(Q_i(X), X) = 0
+\]
+amounts to requiring that
+\[
+\sum_{X \in \{0,1\}^n} R_i(X) \cdot S_i(X) \cdot Q_i(X) = 0.
+\]
+
+To verify all constraints in a single batch, we take a random linear combination using coefficients \(\alpha_i \in \mathbb{F}\). Define the aggregated weight function
+\[
+w(x, X) := \sum_i \alpha_i\, w_i(x, X) = \sum_i \alpha_i\, R_i(X) \cdot S_i(X) \cdot x.
+\]
+
+The WHIR protocol is then employed to prove that the committed aggregated polynomial \( f(X) = \sum_i \alpha_i\, Q_i(X) \) belongs to the Constrained Reed--Solomon code defined by the weight function \( w(x, X) \) and target \(\sigma = 0\). This batch CRS check efficiently verifies that the combined sumcheck constraint holds. TODO: check how to do batch-CRS using WHIR
+
+
+
+
+
+
+
+\end{document}
+
