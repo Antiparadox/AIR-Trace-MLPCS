@@ -15,9 +15,12 @@
 
 \begin{document}
 
-
-
 \maketitle
+
+\begin{abstract}
+This paper presents a novel approach to proving various size AIR (Algebraic Intermediate Representation) with Batch MLPCS (Multi-Linear Polynomial Commitment Scheme). We demonstrate the efficiency and scalability of our method through theoretical analysis and practical implementations.
+\end{abstract}
+
 \section{Formalization of Constraints in AIR Traces}
 
 This section formalizes the concepts and constraints in AIR traces, including multilinear polynomial encodings, virtual columns, and the translation of constraints into sumcheck constraints. We address AIR traces with varying column heights and demonstrate how constraints over these traces reduce to sum checks over virtual polynomials.
@@ -63,7 +66,7 @@ where:
 
 
 \paragraph{Hyperplonk Method: Rotation Verification via Multiset Equality.}  The alternative idea is to have, at the expense of increasing the commitment cost of prover, let the prover supply the virtual column commitment of  \( Q^{\text{rot}}(X) \).
-To verify that the prover’s supplied closed-form expression for \( Q^{\text{rot}}(X) \) is indeed the correct cyclic rotation of \( Q(X) \), we reduce the problem to a multiset equality check. First, define the identity function on the Boolean hypercube as
+To verify that the prover's supplied closed-form expression for \( Q^{\text{rot}}(X) \) is indeed the correct cyclic rotation of \( Q(X) \), we reduce the problem to a multiset equality check. First, define the identity function on the Boolean hypercube as
 \[
 \text{id}(x) = \sum_{i=1}^{n} 2^{i-1} x_i,
 \]
@@ -116,7 +119,13 @@ which are 1 if \(X'\) is maximal and if \(Y'\) is all zeros, respectively. Then,
 
 In the first term, the factor \((1-x_{n+1})(1-y_{n+1}) + x_{n+1}y_{n+1}\) is 1 exactly when \(x_{n+1}=y_{n+1}\), ensuring that no rollover occurs, so the condition depends solely on the \(n\)-bit kernel \(\text{rote}_n(X',Y')\). In the second term, the factor \((1-x_{n+1})y_{n+1} + x_{n+1}(1-y_{n+1})\) detects a rollover (i.e. \(x_{n+1}\neq y_{n+1}\)), and the product \(\mathbf{1}_{\max}(X')\,\mathbf{1}_{0}(Y')\) enforces that \(X'\) is maximal and \(Y'\) is zero.
 
-This recurrence can be evaluated in \(O(n)\) time using dynamic programming. 
+This recurrence can be evaluated in \(O(n)\) time using dynamic programming as follows:
+\begin{enumerate}
+    \item Initialize a table of size \(2^n \times n\) to store the values of \(\text{rote}_n(X,Y)\).
+    \item For each \(n\)-bit vector \(X\), compute \(\text{rote}_n(X,Y)\) for all \(Y\) using the recurrence relation.
+    \item Store the results in the table.
+\end{enumerate}
+
 
 Once the rote kernel \(\text{rote}(X,Y)\) is efficiently computed, we express the rotated polynomial \(Q^{\text{rot}}(X)\) as a convolution of the original polynomial \(Q(Y)\) with the kernel:
 \[
